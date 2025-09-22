@@ -13,7 +13,7 @@ import requests # Para descargar datos desde URLs\
 # --- 1. Cargar y preparar los datos desde URLs ---
 # IMPORTANTE: Reemplaza estas URLs con las tuyas de GitHub Raw si cambian
 URL_CSV = 'https://media.githubusercontent.com/media/dnunezq/mlds-datos-movilidad/refs/heads/main/data/comparendo_2019_limpio_bogota.csv'
-URL_GEOJSON = 'https://bogota-laburbano.opendatasoft.com/explore/dataset/poligonos-localidades/download/?format=geojson'
+URL_GEOJSON = 'https://raw.githubusercontent.com/dnunezq/mlds-datos-movilidad/main/data/poligonos-localidades.geojson'
 
 try:
     df = pd.read_csv(URL_CSV)
