@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Environment variables
+.env
+.env.*
+
+# System files
+.DS_Store
+Thumbs.db
+
+# PyCharm
+.idea/
+
+# Logs
+*.log
+
+# Cache directories
+.cache/
+.pytest_cache/
+
+# Data files (uncomment if you don't want to track data files)
+# *.csv
+# *.json
+# *.geojson
