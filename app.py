@@ -1,6 +1,6 @@
 import pandas as pd
 import folium
-from folium.plugins import HeatMap, MarkerCluster
+from folium.plugins import HeatMap, FastMarkerCluster
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
@@ -126,14 +126,8 @@ def update_dashboard(map_type, mostrar_geojson, codigos_infraccion, clases_vehic
         if map_type == 'heatmap':
             points = list(zip(df_filtrado['latitud'], df_filtrado['longitud']))
             HeatMap(points, radius=15).add_to(mapa_bogota)
-        elif map_type == 'cluster':
-            marker_cluster = MarkerCluster().add_to(mapa_bogota)
-            for _, row in df_filtrado.iterrows():
-                popup_text = f"""<b>Infracción:</b> {row['INFRACCION']}<br><em>{row['tipo_infraccion'].lower()}</em><br><br><b>Fecha:</b> {row['fecha_hora'].strftime('%Y-%m-%d')}<br><b>Hora:</b> {row['hora_ocurrencia'].strftime('%H:%M:%S')}<br><b>Vehículo:</b> {row['CLASE_VEHICULO']}<br>"""
-                folium.Marker(
-                    location=[row['latitud'], row['longitud']],
-                    popup=folium.Popup(popup_text, max_width=300)
-                ).add_to(marker_cluster)
+        elif map_type == 'cluster': 
+            FastMarkerCluster(points).add_to(mapa_bogota)
             
     map_html = mapa_bogota._repr_html_()
 
