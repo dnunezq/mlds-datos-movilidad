@@ -1,6 +1,6 @@
 import pandas as pd
 import folium
-from folium.plugins import HeatMap, FastMarkerCluster, MarkerCluster
+from folium.plugins import HeatMap, FastMarkerCluster
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
@@ -51,7 +51,6 @@ valores_iniciales_infraccion = df_infracciones_unicas['INFRACCION'].unique()[:5]
 
 # --- 2. Inicializar la aplicación ---
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-server = app.server # Exponer el servidor Flask para Vercel
 
 # --- 3. Layout del Dashboard ---
 app.layout = dbc.Container([
@@ -62,7 +61,10 @@ app.layout = dbc.Container([
                 html.H4("Filtros", className="card-title"),
                 dbc.Label("Tipo de Visualización del Mapa:"),
                 dbc.RadioItems(id='map-type-selector', options=[{'label': 'Mapa de Calor', 'value': 'heatmap'}, {'label': 'Clúster de Puntos', 'value': 'cluster'}], value='heatmap', inline=True, className="mb-3"),
+                
+                # --- NUEVO: Interruptor para la capa GeoJSON ---
                 dbc.Switch(id='switch-geojson', label="Mostrar Límite de Localidades", value=False, className="my-2"),
+                
                 html.Hr(),
                 dcc.Dropdown(
                     id='filtro-infraccion',
@@ -101,6 +103,7 @@ app.layout = dbc.Container([
      Output('graph-top-localidades', 'figure'),
      Output('graph-distribucion-hora', 'figure'),
      Output('graph-distribucion-dia', 'figure')],
+    # --- NUEVO: Input del interruptor GeoJSON ---
     [Input('map-type-selector', 'value'),
      Input('switch-geojson', 'value'),
      Input('filtro-infraccion', 'value'),
@@ -124,37 +127,29 @@ def update_dashboard(map_type, mostrar_geojson, codigos_infraccion, clases_vehic
         map_center = [df_filtrado['latitud'].mean(), df_filtrado['longitud'].mean()]
     mapa_bogota = folium.Map(location=map_center, zoom_start=12, tiles="cartodbpositron")
 
+    # --- NUEVO: Lógica condicional para dibujar la capa GeoJSON ---
     if mostrar_geojson:
-        folium.GeoJson(
+        gj = folium.GeoJson(
             geojson_localidades,
             name="Límites Localidades",
             style_function=lambda feature: {
-                'fillOpacity': 0,
-                'color': '#007bff',
+                'fillColor': '#00000000',  # transparente real
+                'color': '#007bff',        # azul
                 'weight': 2,
                 'dashArray': '5, 5'
             }
         ).add_to(mapa_bogota)
 
-    if not df_filtrado.empty:
-        if map_type == 'heatmap':
-            points = list(zip(df_filtrado['latitud'], df_filtrado['longitud']))
-            HeatMap(points, radius=15).add_to(mapa_bogota)
-        elif map_type == 'cluster':
-            marker_cluster = MarkerCluster().add_to(mapa_bogota)
-            for _, row in df_filtrado.iterrows():
-                popup_text = f"""
-                <b>Infracción:</b> {row['INFRACCION']}<br>
-                <em>{row['tipo_infraccion'].lower()}</em><br><br>
-                <b>Fecha:</b> {row['fecha_hora'].strftime('%Y-%m-%d')}<br>
-                <b>Hora:</b> {row['hora_ocurrencia'].strftime('%H:%M:%S')}<br>
-                <b>Vehículo:</b> {row['CLASE_VEHICULO']}<br>
-                """
-                folium.Marker(
-                    location=[row['latitud'], row['longitud']],
-                    popup=folium.Popup(popup_text, max_width=300)
-                ).add_to(marker_cluster)
-            
+        # Solo si existe gj se ajusta el zoom
+        mapa_bogota.fit_bounds(gj.get_bounds())
+
+
+    
+    points = list(zip(df_filtrado['latitud'], df_filtrado['longitud']))
+    if points:
+        if map_type == 'heatmap': HeatMap(points, radius=15).add_to(mapa_bogota)
+        elif map_type == 'cluster': 
+            FastMarkerCluster(points).add_to(mapa_bogota)
     map_html = mapa_bogota._repr_html_()
 
     def crear_figura_vacia(titulo):
