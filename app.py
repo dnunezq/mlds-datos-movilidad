@@ -1,6 +1,6 @@
 import pandas as pd
 import folium
-from folium.plugins import HeatMap, FastMarkerCluster
+from folium.plugins import HeatMap, FastMarkerCluster, MarkerCluster
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
@@ -8,13 +8,13 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 import datetime
-import requests # Para descargar el GeoJSON desde la URL
-import json     # Para cargar el GeoJSON desde el texto descargado
+import requests # Para descargar datos desde URLs
+import json     # Para procesar el GeoJSON
 
 # --- 1. Cargar y preparar los datos desde URLs ---
-# IMPORTANTE: Reemplaza estas URLs con las tuyas de GitHub Raw
-URL_CSV = 'https://media.githubusercontent.com/media/dnunezq/mlds-datos-movilidad/refs/heads/main/data/comparendo_2019_limpio_bogota.csv'
-URL_GEOJSON = 'https://bogota-laburbano.opendatasoft.com/explore/dataset/poligonos-localidades/download/?format=geojson'
+# IMPORTANTE: Reemplaza estas URLs con las tuyas de GitHub Raw si cambian
+URL_CSV = 'https://raw.githubusercontent.com/dnunezq/mlds-datos-movilidad/main/data/comparendo_2019_limpio_bogota.csv'
+URL_GEOJSON = 'https://raw.githubusercontent.com/dnunezq/mlds-datos-movilidad/main/data/poligonos-localidades.geojson'
 
 try:
     df = pd.read_csv(URL_CSV)
@@ -30,6 +30,7 @@ try:
 except Exception as e:
     print(f"Error al cargar los datos desde las URLs: {e}")
     exit()
+
 
 df = df.rename(columns={
     'FECHA_HORA': 'fecha_hora', 'LATITUD': 'latitud', 'LONGITUD': 'longitud',
@@ -48,9 +49,11 @@ df_infracciones_unicas = df.drop_duplicates(subset=['INFRACCION']).sort_values('
 opciones_infraccion = [{'label': f"{row['INFRACCION']} - {row['tipo_infraccion'].lower()}", 'value': row['INFRACCION']} for index, row in df_infracciones_unicas.iterrows()]
 valores_iniciales_infraccion = df_infracciones_unicas['INFRACCION'].unique()[:5].tolist()
 
+# --- 2. Inicializar la aplicación ---
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server # Exponer el servidor Flask para Vercel
 
+# --- 3. Layout del Dashboard ---
 app.layout = dbc.Container([
     dbc.Row(dbc.Col(html.H1("Dashboard de Infracciones de Tránsito en Bogotá", className="text-center text-primary mb-4"), width=12)),
     dbc.Row([
@@ -62,8 +65,12 @@ app.layout = dbc.Container([
                 dbc.Switch(id='switch-geojson', label="Mostrar Límite de Localidades", value=False, className="my-2"),
                 html.Hr(),
                 dcc.Dropdown(
-                    id='filtro-infraccion', options=opciones_infraccion, value=valores_iniciales_infraccion,
-                    multi=True, placeholder="Seleccionar infracción...", optionHeight=115
+                    id='filtro-infraccion',
+                    options=opciones_infraccion,
+                    value=valores_iniciales_infraccion,
+                    multi=True,
+                    placeholder="Seleccionar infracción...",
+                    optionHeight=115
                 ),
                 dcc.Dropdown(id='filtro-vehiculo', options=[{'label': i, 'value': i} for i in sorted(df['CLASE_VEHICULO'].unique())], multi=True, placeholder="Seleccionar vehículo...", className="mt-3"),
                 dcc.Dropdown(id='filtro-localidad', options=[{'label': i, 'value': i} for i in sorted(df['LOCALIDAD'].unique())], multi=True, placeholder="Seleccionar localidad...", className="mt-3"),
@@ -85,6 +92,7 @@ app.layout = dbc.Container([
 ], fluid=True)
 
 
+# --- 4. Callback para actualizar todos los componentes ---
 @app.callback(
     [Output('mapa', 'srcDoc'),
      Output('graph-top-infracciones', 'figure'),
@@ -118,16 +126,34 @@ def update_dashboard(map_type, mostrar_geojson, codigos_infraccion, clases_vehic
 
     if mostrar_geojson:
         folium.GeoJson(
-            geojson_localidades, name="Límites Localidades",
-            style_function=lambda feature: {'fillOpacity': 0, 'color': '#007bff', 'weight': 2, 'dashArray': '5, 5'}
+            geojson_localidades,
+            name="Límites Localidades",
+            style_function=lambda feature: {
+                'fillOpacity': 0,
+                'color': '#007bff',
+                'weight': 2,
+                'dashArray': '5, 5'
+            }
         ).add_to(mapa_bogota)
 
     if not df_filtrado.empty:
         if map_type == 'heatmap':
             points = list(zip(df_filtrado['latitud'], df_filtrado['longitud']))
             HeatMap(points, radius=15).add_to(mapa_bogota)
-        elif map_type == 'cluster': 
-            FastMarkerCluster(points).add_to(mapa_bogota)
+        elif map_type == 'cluster':
+            marker_cluster = MarkerCluster().add_to(mapa_bogota)
+            for _, row in df_filtrado.iterrows():
+                popup_text = f"""
+                <b>Infracción:</b> {row['INFRACCION']}<br>
+                <em>{row['tipo_infraccion'].lower()}</em><br><br>
+                <b>Fecha:</b> {row['fecha_hora'].strftime('%Y-%m-%d')}<br>
+                <b>Hora:</b> {row['hora_ocurrencia'].strftime('%H:%M:%S')}<br>
+                <b>Vehículo:</b> {row['CLASE_VEHICULO']}<br>
+                """
+                folium.Marker(
+                    location=[row['latitud'], row['longitud']],
+                    popup=folium.Popup(popup_text, max_width=300)
+                ).add_to(marker_cluster)
             
     map_html = mapa_bogota._repr_html_()
 
@@ -163,4 +189,3 @@ def update_dashboard(map_type, mostrar_geojson, codigos_infraccion, clases_vehic
         fig_distribucion_dia = px.bar(distribucion_dia, x='dia_semana_nombre', y='conteo', title="Comparendos por Día de la Semana", labels={'dia_semana_nombre': 'Día de la Semana', 'conteo': 'Cantidad'})
 
     return map_html, fig_infracciones, fig_vehiculos, fig_servicio, fig_localidades, fig_distribucion_hora, fig_distribucion_dia
-
