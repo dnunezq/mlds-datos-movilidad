@@ -8,12 +8,12 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 import datetime
-import geopandas as gpd
+import requests # Para descargar datos desde URLs\
 
 # --- 1. Cargar y preparar los datos desde URLs ---
 # IMPORTANTE: Reemplaza estas URLs con las tuyas de GitHub Raw si cambian
 URL_CSV = 'https://raw.githubusercontent.com/dnunezq/mlds-datos-movilidad/refs/heads/main/data/comparendo_2019_limpio_bogota.csv'
-URL_GEOJSON = 'https://raw.githubusercontent.com/dnunezq/mlds-datos-movilidad/main/data/poligonos-localidades.geojson'
+#URL_GEOJSON = 'https://raw.githubusercontent.com/dnunezq/mlds-datos-movilidad/main/data/poligonos-localidades.geojson'
 
 try:
     df = pd.read_csv(URL_CSV)
@@ -21,9 +21,10 @@ try:
     df = df.rename(columns={'HORA_OCURRENCIA': 'hora_ocurrencia'})
     df['hora_ocurrencia'] = pd.to_datetime(df['hora_ocurrencia'], format='%H:%M:%S', errors='coerce').dt.time
 
-    gdf_localidades = gpd.read_file(URL_GEOJSON)
-    # 2. Se asegura de que las coordenadas estén en EPSG:4326 (estándar para web)
-    geojson_localidades = gdf_localidades.to_crs("EPSG:4326")
+    # Descargar y cargar el GeoJSON usando requests y json
+    #response = requests.get(URL_GEOJSON)
+    #response.raise_for_status() # Lanza un error si la descarga falla
+    #geojson_localidades = response.json()
 
 except Exception as e:
     print(f"Error al cargar los datos desde las URLs: {e}")
@@ -68,7 +69,7 @@ app.layout = dbc.Container([
                 dbc.RadioItems(id='map-type-selector', options=[{'label': 'Mapa de Calor', 'value': 'heatmap'}, {'label': 'Clúster de Puntos', 'value': 'cluster'}], value='heatmap', inline=True, className="mb-3"),
                 
                 # --- NUEVO: Interruptor para la capa GeoJSON ---
-                dbc.Switch(id='switch-geojson', label="Mostrar Límite de Localidades", value=False, className="my-2"),
+                #dbc.Switch(id='switch-geojson', label="Mostrar Límite de Localidades", value=False, className="my-2"),
                 
                 html.Hr(),
                 dcc.Dropdown(
@@ -111,7 +112,7 @@ app.layout = dbc.Container([
      Output('graph-distribucion-dia', 'figure')],
     # --- NUEVO: Input del interruptor GeoJSON ---
     [Input('map-type-selector', 'value'),
-     Input('switch-geojson', 'value'),
+     #Input('switch-geojson', 'value'),
      Input('filtro-infraccion', 'value'),
      Input('filtro-vehiculo', 'value'),
      Input('filtro-localidad', 'value'),
@@ -137,6 +138,7 @@ def update_dashboard(map_type, codigos_infraccion, clases_vehiculo, localidades,
     mapa_bogota = folium.Map(location=map_center, zoom_start=12, tiles="cartodbpositron")
 
     # --- NUEVO: Lógica condicional para dibujar la capa GeoJSON ---
+    """
     if mostrar_geojson:
         gj = folium.GeoJson(
             geojson_localidades,
@@ -151,6 +153,9 @@ def update_dashboard(map_type, codigos_infraccion, clases_vehiculo, localidades,
 
         # Solo si existe gj se ajusta el zoom
         mapa_bogota.fit_bounds(gj.get_bounds())
+
+    """
+    
 
     
     points = list(zip(df_filtrado['latitud'], df_filtrado['longitud']))
