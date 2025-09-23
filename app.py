@@ -56,6 +56,13 @@ app.layout = dbc.Container([
     dbc.Row(dbc.Col(html.H1("Dashboard de Infracciones de Tránsito en Bogotá", className="text-center text-primary mb-4"), width=12)),
     dbc.Row([
         dbc.Col([
+            dbc.Card(
+                dbc.CardBody([
+                    html.H6("Total de Comparendos Filtrados", className="card-subtitle"),
+                    html.H2(id='contador-comparendos', className="text-center text-primary")
+                ]),
+                className="mb-3", # Margen inferior para separarlo de los filtros
+            ),
             dbc.Card(dbc.CardBody([
                 html.H4("Filtros", className="card-title"),
                 dbc.Label("Tipo de Visualización del Mapa:"),
@@ -95,7 +102,8 @@ app.layout = dbc.Container([
 
 # --- 4. Callback para actualizar todos los componentes ---
 @app.callback(
-    [Output('mapa', 'srcDoc'),
+    [Output('contador-comparendos', 'children'),
+     Output('mapa', 'srcDoc'),
      Output('graph-top-infracciones', 'figure'),
      Output('graph-top-vehiculos', 'figure'),
      Output('graph-top-servicio', 'figure'),
@@ -120,6 +128,9 @@ def update_dashboard(map_type, codigos_infraccion, clases_vehiculo, localidades,
         (df['hora'] >= rango_horas[0]) & (df['hora'] <= rango_horas[1]) &
         (df['mes'] >= rango_meses[0]) & (df['mes'] <= rango_meses[1])
     ]
+
+    numero_comparendos = len(df_filtrado)
+    texto_contador = f"{numero_comparendos:,}"
 
     map_center = [4.60971, -74.08175]
     if not df_filtrado.empty:
@@ -185,4 +196,4 @@ def update_dashboard(map_type, codigos_infraccion, clases_vehiculo, localidades,
         distribucion_dia = df_filtrado.groupby(['dia_semana_num', 'dia_semana_nombre']).size().reset_index(name='conteo').sort_values('dia_semana_num')
         fig_distribucion_dia = px.bar(distribucion_dia, x='dia_semana_nombre', y='conteo', title="Comparendos por Día de la Semana", labels={'dia_semana_nombre': 'Día de la Semana', 'conteo': 'Cantidad'})
 
-    return map_html, fig_infracciones, fig_vehiculos, fig_servicio, fig_localidades, fig_distribucion_hora, fig_distribucion_dia
+    return texto_contador, map_html, fig_infracciones, fig_vehiculos, fig_servicio, fig_localidades, fig_distribucion_hora, fig_distribucion_dia
